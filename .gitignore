@@ -1,0 +1,12 @@
+# Debug artifacts from sync/diff workflows
+*-LIVE.json
+*-BACKUP-*.json
+.live-snapshot/
+
+# Local env / secrets
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

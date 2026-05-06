@@ -1,5 +1,5 @@
 {
-  "name": "Job Search LinkedIn - Executive Roles",
+  "name": "Job Search LinkedIn - Engineer Roles - HTTP",
   "nodes": [
     {
       "parameters": {},
@@ -14,7 +14,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ===== JOB SEARCH CONFIG (ROLE-SPLIT WORKFLOW) =====\n// Scope: role_executive\n\nconst roleKeywords = [\n  'Chief Automation Officer',\n  'Chief AI Officer',\n  'VP Intelligent Automation',\n  'VP of Automation',\n  'VP AI',\n  'Head of Automation',\n  'Head of AI',\n  'Head of AI Strategy',\n  'Director of Intelligent Automation',\n  'Director of Automation',\n  'Director AI Governance',\n  'Director Enterprise AI',\n];\n\nconst config = {\n  workflowScope: 'role_executive',\n\n  indeedSearches: [],\n\n  locationPlans: [\n    {\n      planId: 'ny_remote_hybrid',\n      location: 'New York City Metropolitan Area',\n      workTypes: ['remote', 'hybrid']\n    },\n    {\n      planId: 'us_remote_only',\n      location: 'United States',\n      workTypes: ['remote']\n    }\n  ],\n\n  datePosted: 'past_24h',\n  maxResultsPerSearch: 40,\n  includeComparisonWindow: false,\n  comparisonDatePosted: 'past_week',\n  comparisonMaxResults: 40,\n\n  fetchFullDescription: true,\n  enrichWithAI: false,\n  linkedinCookie: $env.LINKEDIN_COOKIE || '',\n  actorProxyConfig: {},\n\n  runGuardEnabled: true,\n  runGuardMinMinutes: 45,\n\n  maxQueriesPerRun: 10,\n\n  // Safe mode (KEPT)\n  safeMode: false,\n  safeMaxQueries: 2,\n  safeMaxResults: 10,\n  safeFetchFullDescription: false,\n\n  testMode: false,\n  testMaxQueries: 2,\n  testMaxResults: 10,\n  testFetchFullDescription: false,\n\n  freshnessDays: 14,\n\n  scoring: {\n    titleKeywords: [\n  'Chief Automation Officer',\n  'Chief AI Officer',\n  'VP Intelligent Automation',\n  'VP of Automation',\n  'VP AI',\n  'Head of Automation',\n  'Head of AI',\n  'Head of AI Strategy',\n  'Director of Intelligent Automation',\n  'Director of Automation',\n  'Director AI Governance',\n  'Director Enterprise AI',\n],\n    partialKeywords: [\n      'automation', 'workflow', 'ai', 'agentic', 'rpa', 'intelligent automation',\n      'hyperautomation', 'power platform', 'power automate', 'servicenow',\n      'integration', 'ipaas', 'workato', 'mulesoft', 'boomi', 'zapier', 'make', 'n8n'\n    ],\n    seniorityWords: [\n      'chief', 'vp', 'vice president', 'director', 'head of', 'senior director',\n      'principal', 'lead', 'architect'\n    ],\n    nycAreaKeywords: [\n      'new york', 'nyc', 'newburgh', 'poughkeepsie', 'hudson valley',\n      'westchester', 'stamford', 'jersey city', 'newark', 'white plains',\n      'yonkers', 'brooklyn', 'manhattan', 'bronx', 'queens', 'staten island'\n    ],\n    aiGovernanceKeywords: [\n      'ai governance', 'ai adoption', 'ai strategy', 'ai policy',\n      'responsible ai', 'ai ethics', 'ai transformation', 'ai roadmap',\n      'generative ai', 'enterprise ai'\n    ],\n    londonKeywords: [\n      'london', 'united kingdom', ', uk', ', england', 'greater london'\n    ],\n    highRelevanceThreshold: 60\n  },\n\n  airtableBaseId: 'appHQJJBGSLIXybkr',\n  airtableTableId: 'tbltkycOY9FgUdQpm',\n  airtableApiKey: '{{ $credentials.airtableApiKey }}',\n\n  slackWebhookUrl: $env.SLACK_WEBHOOK_URL || '',\n  telegramBotToken: '{{ $credentials.telegramBotToken }}',\n  telegramChatId: '6592429185'\n};\n\nconst primarySearches = [];\nfor (const keywords of roleKeywords) {\n  for (const plan of config.locationPlans) {\n    for (const workType of plan.workTypes) {\n      primarySearches.push({\n        keywords,\n        location: plan.location,\n        workType,\n        datePosted: config.datePosted,\n        maxResults: config.maxResultsPerSearch,\n        scope: config.workflowScope,\n        planId: plan.planId,\n        windowId: 'primary'\n      });\n    }\n  }\n}\n\nconst comparisonSearches = [];\nif (config.includeComparisonWindow) {\n  for (const keywords of roleKeywords) {\n    for (const plan of config.locationPlans) {\n      for (const workType of plan.workTypes) {\n        comparisonSearches.push({\n          keywords,\n          location: plan.location,\n          workType,\n          datePosted: config.comparisonDatePosted,\n          maxResults: config.comparisonMaxResults,\n          scope: config.workflowScope,\n          planId: plan.planId,\n          windowId: 'comparison'\n        });\n      }\n    }\n  }\n}\n\nconfig.linkedinSearches = [...primarySearches, ...comparisonSearches];\nconst maxQueriesPerRun = Math.max(1, Number(config.maxQueriesPerRun ?? 10));\nconfig.linkedinSearches = config.linkedinSearches.slice(0, maxQueriesPerRun);\n\nconst effectiveSafeMode = !!(config.safeMode || config.testMode);\nif (effectiveSafeMode) {\n  const maxQueries = Math.max(1, Number(config.safeMaxQueries ?? config.testMaxQueries ?? 1));\n  const maxResults = Math.max(1, Number(config.safeMaxResults ?? config.testMaxResults ?? 10));\n  const safeFetch = (config.safeFetchFullDescription ?? config.testFetchFullDescription ?? false);\n\n  config.linkedinSearches = config.linkedinSearches\n    .slice(0, maxQueries)\n    .map(search => ({ ...search, maxResults: Math.min(Number(search.maxResults || 40), maxResults) }));\n\n  config.fetchFullDescription = !!safeFetch;\n}\n\nconfig._abortRun = false;\nconfig._abortReason = '';\n\ntry {\n  const staticData = $getWorkflowStaticData('global');\n  const nowMs = Date.now();\n  const minGapMs = Math.max(1, Number(config.runGuardMinMinutes || 45)) * 60 * 1000;\n  const runGuardKey = `linkedinScraperLastStartMs_${config.workflowScope}`;\n  const lastStartMs = Number(staticData[runGuardKey] || 0);\n\n  if (config.runGuardEnabled && lastStartMs && (nowMs - lastStartMs) < minGapMs) {\n    const elapsedMinutes = Math.floor((nowMs - lastStartMs) / 60000);\n    const waitMinutes = Math.ceil((minGapMs - (nowMs - lastStartMs)) / 60000);\n    config._abortRun = true;\n    config._abortReason = `Blocked by run guard: last run started ${elapsedMinutes} minute(s) ago. Try again in about ${waitMinutes} minute(s).`;\n  } else {\n    staticData[runGuardKey] = nowMs;\n  }\n} catch (error) {\n  config._abortRun = false;\n  config._abortReason = `Run guard unavailable: ${error?.message || String(error)}`;\n}\n\nreturn [{ json: config }];\n"
+        "jsCode": "// ===== JOB SEARCH CONFIG (ROLE-SPLIT WORKFLOW) =====\n// Scope: role_engineer\n\nconst roleKeywords = [\n  'AI Automation Engineer',\n  'Workflow Automation Engineer',\n  'AI Agent Engineer',\n  'Intelligent Automation Engineer',\n  'Automation Engineer',\n  'Process Automation Engineer',\n  'AI Workflow Engineer',\n  'Automation and AI Agent Engineer',\n  'AI Solutions Engineer',\n  'Integration Developer'\n];\n\nconst config = {\n  workflowScope: 'role_engineer',\n\n  indeedSearches: [],\n\n  locationPlans: [\n    {\n      planId: 'ny_remote_hybrid',\n      location: 'New York City Metropolitan Area',\n      workTypes: ['remote', 'hybrid']\n    },\n    {\n      planId: 'us_remote_only',\n      location: 'United States',\n      workTypes: ['remote']\n    }\n  ],\n\n  datePosted: 'past_24h',\n  maxResultsPerSearch: 40,\n  includeComparisonWindow: false,\n  comparisonDatePosted: 'past_week',\n  comparisonMaxResults: 40,\n\n  fetchFullDescription: true,\n  enrichWithAI: false,\n  linkedinCookie: $env.LINKEDIN_COOKIE || '',\n  actorProxyConfig: {},\n\n  runGuardEnabled: true,\n  runGuardMinMinutes: 45,\n\n  maxQueriesPerRun: 10,\n\n  // Safe mode (KEPT)\n  safeMode: false,\n  safeMaxQueries: 2,\n  safeMaxResults: 10,\n  safeFetchFullDescription: false,\n\n  testMode: false,\n  testMaxQueries: 2,\n  testMaxResults: 10,\n  testFetchFullDescription: false,\n\n  freshnessDays: 14,\n\n  scoring: {\n    titleKeywords: [\n      'AI Automation Engineer',\n      'Workflow Automation Engineer',\n      'AI Agent Engineer',\n      'Intelligent Automation Engineer',\n      'Automation Engineer',\n      'Process Automation Engineer',\n      'AI Workflow Engineer',\n      'Automation and AI Agent Engineer',\n      'AI Solutions Engineer',\n      'Integration Developer'\n    ],\n    partialKeywords: [\n      'automation', 'workflow', 'ai', 'agentic', 'rpa', 'intelligent automation',\n      'hyperautomation', 'power platform', 'power automate', 'servicenow',\n      'integration', 'ipaas', 'workato', 'mulesoft', 'boomi', 'zapier', 'make', 'n8n'\n    ],\n    seniorityWords: [\n      'chief', 'vp', 'vice president', 'director', 'head of', 'senior director',\n      'principal', 'lead', 'architect'\n    ],\n    nycAreaKeywords: [\n      'new york', 'nyc', 'newburgh', 'poughkeepsie', 'hudson valley',\n      'westchester', 'stamford', 'jersey city', 'newark', 'white plains',\n      'yonkers', 'brooklyn', 'manhattan', 'bronx', 'queens', 'staten island'\n    ],\n    aiGovernanceKeywords: [\n      'ai governance', 'ai adoption', 'ai strategy', 'ai policy',\n      'responsible ai', 'ai ethics', 'ai transformation', 'ai roadmap',\n      'generative ai', 'enterprise ai'\n    ],\n    londonKeywords: [\n      'london', 'united kingdom', ', uk', ', england', 'greater london'\n    ],\n    highRelevanceThreshold: 60\n  },\n\n  airtableBaseId: 'appHQJJBGSLIXybkr',\n  airtableTableId: 'tbltkycOY9FgUdQpm',\n  airtableApiKey: '{{ $credentials.airtableApiKey }}',\n\n  slackWebhookUrl: $env.SLACK_WEBHOOK_URL || '',\n  telegramBotToken: '{{ $credentials.telegramBotToken }}',\n  telegramChatId: '6592429185'\n};\n\nconst primarySearches = [];\nfor (const keywords of roleKeywords) {\n  for (const plan of config.locationPlans) {\n    for (const workType of plan.workTypes) {\n      primarySearches.push({\n        keywords,\n        location: plan.location,\n        workType,\n        datePosted: config.datePosted,\n        maxResults: config.maxResultsPerSearch,\n        scope: config.workflowScope,\n        planId: plan.planId,\n        windowId: 'primary'\n      });\n    }\n  }\n}\n\nconst comparisonSearches = [];\nif (config.includeComparisonWindow) {\n  for (const keywords of roleKeywords) {\n    for (const plan of config.locationPlans) {\n      for (const workType of plan.workTypes) {\n        comparisonSearches.push({\n          keywords,\n          location: plan.location,\n          workType,\n          datePosted: config.comparisonDatePosted,\n          maxResults: config.comparisonMaxResults,\n          scope: config.workflowScope,\n          planId: plan.planId,\n          windowId: 'comparison'\n        });\n      }\n    }\n  }\n}\n\nconfig.linkedinSearches = [...primarySearches, ...comparisonSearches];\nconst maxQueriesPerRun = Math.max(1, Number(config.maxQueriesPerRun ?? 10));\nconfig.linkedinSearches = config.linkedinSearches.slice(0, maxQueriesPerRun);\n\nconst effectiveSafeMode = !!(config.safeMode || config.testMode);\nif (effectiveSafeMode) {\n  const maxQueries = Math.max(1, Number(config.safeMaxQueries ?? config.testMaxQueries ?? 1));\n  const maxResults = Math.max(1, Number(config.safeMaxResults ?? config.testMaxResults ?? 10));\n  const safeFetch = (config.safeFetchFullDescription ?? config.testFetchFullDescription ?? false);\n\n  config.linkedinSearches = config.linkedinSearches\n    .slice(0, maxQueries)\n    .map(search => ({ ...search, maxResults: Math.min(Number(search.maxResults || 40), maxResults) }));\n\n  config.fetchFullDescription = !!safeFetch;\n}\n\nconfig._abortRun = false;\nconfig._abortReason = '';\n\ntry {\n  const staticData = $getWorkflowStaticData('global');\n  const nowMs = Date.now();\n  const minGapMs = Math.max(1, Number(config.runGuardMinMinutes || 45)) * 60 * 1000;\n  const runGuardKey = `linkedinScraperLastStartMs_${config.workflowScope}`;\n  const lastStartMs = Number(staticData[runGuardKey] || 0);\n\n  if (config.runGuardEnabled && lastStartMs && (nowMs - lastStartMs) < minGapMs) {\n    const elapsedMinutes = Math.floor((nowMs - lastStartMs) / 60000);\n    const waitMinutes = Math.ceil((minGapMs - (nowMs - lastStartMs)) / 60000);\n    config._abortRun = true;\n    config._abortReason = `Blocked by run guard: last run started ${elapsedMinutes} minute(s) ago. Try again in about ${waitMinutes} minute(s).`;\n  } else {\n    staticData[runGuardKey] = nowMs;\n  }\n} catch (error) {\n  config._abortRun = false;\n  config._abortReason = `Run guard unavailable: ${error?.message || String(error)}`;\n}\n\nreturn [{ json: config }];\n"
       },
       "id": "5e29007d-6295-40ef-8faa-6839655fb07b",
       "name": "Config",
@@ -78,6 +78,12 @@
             "response": {
               "neverError": true,
               "responseFormat": "json"
+            }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 4,
+              "batchInterval": 1100
             }
           }
         }
@@ -160,6 +166,12 @@
               "neverError": true,
               "responseFormat": "json"
             }
+          },
+          "batching": {
+            "batch": {
+              "batchSize": 4,
+              "batchInterval": 1100
+            }
           }
         }
       },
@@ -191,7 +203,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\n\nlet cfg = items[0]?.json?._config || null;\nif (!cfg) {\n  try { cfg = $('Dedup and Score').first()?.json?._config || null; } catch {}\n}\n\nconst slackWebhookUrl = cfg?.slackWebhookUrl || $env.SLACK_WEBHOOK_URL || '';\n\nconst newJobs = items.filter(i => i.json?.records?.[0]?.id);\nconst count = newJobs.length;\n\nreturn [{\n  json: {\n    message: count > 0 ? `New jobs have been added to Airtable. (${count})` : 'No new jobs added.',\n    count,\n    slackWebhookUrl,\n  }\n}];\n"
+        "jsCode": "const items = $input.all();\n\nlet cfg = items[0]?.json?._config || null;\nif (!cfg) { try { cfg = $('Dedup and Score').first()?.json?._config || null; } catch {} }\n\nconst slackWebhookUrl = cfg?.slackWebhookUrl || $env.SLACK_WEBHOOK_URL || '';\n\nlet succeeded = 0;\nlet rateLimited = 0;\nlet otherFailed = 0;\nfor (const i of items) {\n  const j = i.json || {};\n  if (j.records && j.records[0] && j.records[0].id) succeeded += 1;\n  else if (Array.isArray(j.errors) && j.errors.some(e => (e.error||'').includes('RATE_LIMIT'))) rateLimited += 1;\n  else if (j.errors || j.error) otherFailed += 1;\n}\nconst total = items.length;\nconst count = succeeded;\n\nlet message;\nif (total === 0) {\n  message = 'No new jobs added.';\n} else if (rateLimited === 0 && otherFailed === 0) {\n  message = `New jobs have been added to Airtable. (${succeeded})`;\n} else {\n  message = `Airtable: ${succeeded} added, ${rateLimited} rate-limited, ${otherFailed} other failed (out of ${total}).`;\n}\n\nreturn [{ json: { message, count, succeeded, rateLimited, otherFailed, total, slackWebhookUrl } }];\n"
       },
       "id": "55303384-e1c2-46ff-a2cf-0da05c69c00a",
       "name": "Build Notification",
@@ -320,33 +332,68 @@
     },
     {
       "parameters": {
-        "operation": "Run actor and get dataset",
-        "actorId": {
-          "__rl": true,
-          "value": "emj1kLbPVetKdfJk8",
-          "mode": "list",
-          "cachedResultName": "LinkedIn Jobs Scraper (mfrostbutter/linkedin-jobs-scraper)",
-          "cachedResultUrl": "https://console.apify.com/actors/emj1kLbPVetKdfJk8/input"
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/emj1kLbPVetKdfJk8/run-sync-get-dataset-items",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
         },
-        "customBody": "={{ (() => {\n  const idx = Number($json._queryIndex || 0);\n  if (idx > 10) {\n    throw new Error(`Safety cap exceeded: query index ${idx} > 10`);\n  }\n\n  return {\n    keywords: $json.keywords,\n    location: $json.location,\n    workType: $json.workType,\n    datePosted: $json.datePosted,\n    maxResults: $json.maxResults,\n    fetchFullDescription: $json.fetchFullDescription,\n    enrichWithAI: $json.enrichWithAI,\n    linkedinCookie: $json.linkedinCookie || '',\n    proxyConfig: $json.actorProxyConfig || {},\n    _n8nQueryIndex: idx,\n    _n8nQueryCount: Number($json._queryCount || 0),\n    _n8nExecutionId: String($execution.id || ''),\n    _n8nWorkflowScope: String($json._config?.workflowScope || ''),\n  };\n})() }}"
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => {\n  const idx = Number($json._queryIndex || 0);\n  if (idx > 10) throw new Error(`Safety cap exceeded: query index ${idx} > 10`);\n  return {\n    keywords: $json.keywords,\n    location: $json.location,\n    workType: $json.workType,\n    datePosted: $json.datePosted,\n    maxResults: $json.maxResults,\n    fetchFullDescription: $json.fetchFullDescription,\n    enrichWithAI: $json.enrichWithAI,\n    linkedinCookie: $json.linkedinCookie || '',\n    proxyConfig: $json.actorProxyConfig || {},\n    _n8nQueryIndex: idx,\n    _n8nQueryCount: Number($json._queryCount || 0),\n    _n8nExecutionId: String($execution.id || ''),\n    _n8nWorkflowScope: String($json._config?.workflowScope || ''),\n  };\n})() }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": false
+            }
+          },
+          "timeout": 300000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 5000
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
-      "type": "@apify/n8n-nodes-apify.apify",
-      "typeVersion": 1,
+      "id": "http-apify-sync-7e3a",
+      "name": "Run Apify (HTTP Sync)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         992,
         480
       ],
-      "id": "bf110a83-bfee-45bf-93b3-93668b3e8797",
-      "name": "Run LinkedIn Actor",
       "credentials": {
-        "apifyApi": {
-          "id": "LpaSWzuRBBBzjNnF",
-          "name": "Apify account"
+        "httpHeaderAuth": {
+          "id": "<set in n8n UI>",
+          "name": "Apify API (Header)"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Apify run-sync-get-dataset-items returns an array of dataset items.\n// n8n HTTP node delivers it as either {json: <array>} or wraps in {json: {body: <array>}}.\n// Explode into one n8n item per dataset record.\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  let arr = null;\n  if (Array.isArray(j)) arr = j;\n  else if (j && Array.isArray(j.body)) arr = j.body;\n  else if (j && Array.isArray(j.data)) arr = j.data;\n  else if (j && typeof j === 'object') arr = [j];\n  if (!arr) continue;\n  for (const r of arr) {\n    if (r && typeof r === 'object') out.push({ json: r });\n  }\n}\nreturn out;\n"
+      },
+      "id": "flatten-apify-7e3b",
+      "name": "Flatten Apify Dataset",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        320
+      ]
     }
   ],
-  "pinData": {},
   "connections": {
     "Config": {
       "main": [
@@ -453,7 +500,7 @@
       "main": [
         [
           {
-            "node": "Run LinkedIn Actor",
+            "node": "Run Apify (HTTP Sync)",
             "type": "main",
             "index": 0
           }
@@ -482,7 +529,18 @@
         ]
       ]
     },
-    "Run LinkedIn Actor": {
+    "Run Apify (HTTP Sync)": {
+      "main": [
+        [
+          {
+            "node": "Flatten Apify Dataset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Apify Dataset": {
       "main": [
         [
           {
@@ -494,24 +552,9 @@
       ]
     }
   },
-  "active": false,
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": false,
     "callerPolicy": "workflowsFromSameOwner"
-  },
-  "versionId": "e4dbf0d0-b97e-4353-a330-e82f1e25d137",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "895500a397a3e801b63ba89a7767be9b5fd9a0d0cae8bd221476442daa439321"
-  },
-  "id": "be698f24f2524cfe",
-  "tags": [
-    {
-      "updatedAt": "2026-04-20T14:44:59.966Z",
-      "createdAt": "2026-04-20T14:44:59.966Z",
-      "id": "tag-job-search",
-      "name": "Job Search"
-    }
-  ]
+  }
 }
